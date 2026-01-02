@@ -1,43 +1,38 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const app = express().use(bodyParser.json());
 
-const app = express();
-app.use(bodyParser.json());
+const VERIFY_TOKEN = process.env.MY_VERIFY_TOKEN;
 
-const PORT = process.env.PORT || 3000;
-
-/**
- * Health check
- */
-app.get("/", (req, res) => {
-  res.send("WhatsApp backend running ✅");
-});
-
-/**
- * Webhook verification
- */
+// 1. Verification Endpoint (GET)
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  if (
-    mode === "subscribe" &&
-    token === process.env.WHATSAPP_VERIFY_TOKEN
-  ) {
-    return res.status(200).send(challenge);
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("Webhook Verified Successfully!");
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
   }
-  return res.sendStatus(403);
 });
 
-/**
- * Receive WhatsApp messages
- */
+// 2. Message Receiver (POST)
 app.post("/webhook", (req, res) => {
-  console.log("Incoming webhook:", JSON.stringify(req.body, null, 2));
-  res.sendStatus(200);
+  const body = req.body;
+  if (body.object === "whatsapp_business_account") {
+    // Return 200 OK immediately to avoid Meta retries
+    res.sendStatus(200);
+    
+    // Log message for live debugging
+    if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
+      console.log("New Message:", JSON.stringify(body.entry[0].changes[0].value.messages[0], null, 2));
+    }
+  } else {
+    res.sendStatus(404);
+  }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(Live Webhook listening on port ${PORT}));
